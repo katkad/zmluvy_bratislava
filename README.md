@@ -3,8 +3,10 @@
 **vstupy**
 
 podstranky pod http://www.bratislava.sk/register/vismo/zobraz_dok.asp?id_org=700026&id_ktg=1001&p1=15331
+
 * [kupne zmluvy](http://www.bratislava.sk/register/vismo/zobraz_dok.asp?id_org=700026&id_ktg=1154&archiv=0&p1=15331)
 * [zmluvy na stavebne prace](http://www.bratislava.sk/register/vismo/zobraz_dok.asp?id_org=700026&id_ktg=1125&archiv=0&p1=15331)
+
 ...
 
 
