@@ -16,7 +16,7 @@ jedna tabulka:
 
 * `kategoria zmluv` (id_ktg zo zdrojoveho URL)
 * `id HTML stranky` bratislava.sk/register/vismo/dokumenty2.asp?id_org=700026&id=**24396**&p1=15331
-* `id PDF dokumentu` www.bratislava.sk/register/VismoOnline_ActionScripts/File.ashx?id_org=700026&id_dokumenty=**24397**
+* `id PDF dokumentu` bratislava.sk/register/VismoOnline_ActionScripts/File.ashx?id_org=700026&id_dokumenty=**24397**
 * `datum`
 * `titulok`
 * `popis`
