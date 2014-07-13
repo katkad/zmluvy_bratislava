@@ -6,6 +6,7 @@ import scraperwiki
 import urlparse
 import requests
 import logging
+import json
 import time
 
 from database import create_db
@@ -31,6 +32,7 @@ class BratislavaScraper(object):
 
 
     LISTING_AMOUNT = 10  # max 100
+    MAX_PAGES = 1
     HTTP_OK_CODES = [200]
 
 
@@ -46,8 +48,8 @@ class BratislavaScraper(object):
 
     def doc_url_to_id(self, url):
         params = self.get_url_params(url)
-        if 'dokument_id' in params:
-            return params['dokument_id']
+        if 'id_dokumenty' in params:
+            return params['id_dokumenty'][0]
         else:
             return None
 
@@ -62,6 +64,9 @@ class BratislavaScraper(object):
 
 
     def get_content(self, path):
+        '''
+        Download webpage.
+        '''
         url = urlparse.urljoin(self.DOMAIN, path)
         logging.info('Requesting content from url: "{}"'.format(url))
         response = requests.get(url)
@@ -74,13 +79,23 @@ class BratislavaScraper(object):
 
 
     def scrape(self):
-        page = 1
-        content = self.get_content(self.LIST_TPL.format(limit=self.LISTING_AMOUNT, page=page))
-        if content:
-            self.parse_list(content)
+        '''
+        Main entry point
+        '''
+        # TODO check pages from actual page OR check for unknow page result
+        for page in xrange(1, self.MAX_PAGES + 1):
+            content = self.get_content(self.LIST_TPL.format(limit=self.LISTING_AMOUNT, page=page))
+            if not content:
+                break
+             
+            if self.parse_list(content) is None:
+                break
         
 
     def parse_list(self, html):
+        '''
+        Parse results table = get date, details, person and possibly additional documents
+        '''
         soup = bs(html)
 
         table = soup.find('div', {'id': 'kategorie'}).find('table', {'class': 'seznam'})
@@ -93,9 +108,10 @@ class BratislavaScraper(object):
 
             if row['html_id']:
                 # we have link for details page
-                row['document_urls'] = self.scrape_documents(row['html_id'])
+                row['document_urls'] = self.scrape_details(row['html_id'])
 
-            row['document_ids'] = map(self.doc_url_to_id, row['document_urls'])
+            # load document ids from document urls
+            row['document_ids'] = map(self.doc_url_to_id, row['document_urls']) if row['document_urls'] else None
 
             # date
             try:
@@ -110,10 +126,45 @@ class BratislavaScraper(object):
                 # missing responsible person or one without personal page
                 row['responsible_person'] = None
 
-            print row
+            # explicitly convert documents (urls and ids) to json
+            row['document_urls'] = json.dumps(row['document_urls'])
+            row['document_ids'] = json.dumps(row['document_ids'])
+
+            # update db and decide what to do next
+            # we wither have html_id (higher priority) or list of document ids; if not, we don't save the entry
+            if row['html_id']:
+                html_id = scraperwiki.sqlite.get_var('html_id')
+                if html_id == row['html_id']:
+                    logging.info('Reached known result (html_id): "{}"'.format(html_id))
+                    break
+                scraperwiki.sqlite.save_var('html_id', row['html_id'])
+
+            elif row['document_ids']:
+                doc_ids = scraperwiki.sqlite.get_var('doc_ids')
+                if doc_ids == row['document_ids']:
+                    logging.info('Reached known result (doc_ids): "{}"'.format(doc_ids))
+                    break
+                scraperwiki.sqlite.save_var('doc_ids', row['document_ids'])
+
+            else:
+                logging.error('Not enough data to save this entry: {}: "{}"'.format(row['date']. row['title']))
+                continue
+
+            try:
+                scraperwiki.sqlite.save(['html_id', 'document_ids'], row, table_name='data')
+            except:
+                print row
+                raise
+
+        else:
+            # for ended without break
+            return True
 
 
-    def scrape_documents(self, page_id):
+    def scrape_details(self, page_id):
+        '''
+        For given page id, return list of documents + process categories.
+        '''
         content = self.get_content(self.DETAILS_TPL.format(page_id))
         soup = bs(content)
         links = soup.find('div', {'class': 'odkazy'})
@@ -126,10 +177,17 @@ class BratislavaScraper(object):
             if li.a['href'].startswith(self.DOCUMENT_PATH):
                 document_urls.append(urlparse.urljoin(self.DOCUMENT_PATH, li.a['href']))
 
+        # TODO process categories while we have the document
+
         return document_urls
 
 
     def parse_description(self, node):
+        '''
+        Parse "Nazov" column from list of documents and return available details.
+
+        - title, short description, link either to details page or document, category
+        '''
         # default None values
         data = {'title': None,
                 'document_urls': None,
@@ -166,8 +224,7 @@ class BratislavaScraper(object):
 
         # fill in description
         if node.div and node.div.br:
-            print node.div.br.previous_sibling
-            data['description'] = node.div.br.previous_sibling
+            data['description'] = unicode(node.div.br.previous_sibling)
         elif node.div:
             data['description'] = node.div.text
         else:
@@ -189,6 +246,10 @@ class BratislavaScraper(object):
 
 
     def scrape_person(self, a):
+        '''
+        Download person info and save it to db if it's not already there.
+        '''
+
         params = self.get_url_params(a['href'])
         id_o = int(params['id_o'][0])
         
@@ -207,14 +268,16 @@ class BratislavaScraper(object):
         else:
             person['email'] = None
         
-        logging.info('Inserting person "{}" into database'.format(person['name']))
+        # logging.info('Inserting person "{}" into database'.format(person['name']))
         scraperwiki.sqlite.save(['id'], person, table_name='people')
+
+        return id_o
 
 
 if __name__ == '__main__':
     # create tables explicitly
     create_db()
 
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.ERROR)
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
     scraper = BratislavaScraper(sleep=1/10)
     scraper.scrape()

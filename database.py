@@ -1,6 +1,9 @@
 import scraperwiki
 
 def create_db():
+	# main table
+	# automatic, without foreign keys set :(
+
     # people table
     scraperwiki.sqlite.execute('''
         CREATE TABLE IF NOT EXISTS people(
