@@ -21,11 +21,13 @@ class BratislavaScraper(object):
     # path template to page with personal details
     PEOPLE_TPL = '/register/vismo/o_osoba.asp?id_org=700026&id_o={}'
 
-    # path to entry details
+    # entry details page
     DETAILS_PATH = '/register/vismo/dokumenty2.asp'
+    DETAILS_TPL = '/register/vismo/dokumenty2.asp?id_org=700026&id={}&p1=15331'
 
     # path to document
     DOCUMENT_PATH = '/register/VismoOnline_ActionScripts/File.ashx'
+    DOCUMENT_TPL = '/register/VismoOnline_ActionScripts/File.ashx?id_org=700026&id_dokumenty={}'
 
 
     LISTING_AMOUNT = 10  # max 100
@@ -35,13 +37,22 @@ class BratislavaScraper(object):
     def __init__(self, sleep=1/2):
         self.sleep = sleep
 
+
     @staticmethod
     def get_url_params(href):
         url = urlparse.urlparse(href)
         return urlparse.parse_qs(url.query)
 
-    @staticmethod
-    def parse_person_email(html):
+
+    def doc_url_to_id(self, url):
+        params = self.get_url_params(url)
+        if 'dokument_id' in params:
+            return params['dokument_id']
+        else:
+            return None
+
+
+    def parse_person_email(self, html):
         soup = bs(html)
 
         dl = soup.find('div', {'id': 'osobnost'}).dl
@@ -76,21 +87,21 @@ class BratislavaScraper(object):
         
         for table_row in table.tbody.find_all('tr'):
             cells = table_row.find_all('td')
-            row = {}
+
+            # name/desc/category
+            row = self.parse_description(cells[1])
+
+            if row['html_id']:
+                # we have link for details page
+                row['document_urls'] = self.scrape_documents(row['html_id'])
+
+            row['document_ids'] = map(self.doc_url_to_id, row['document_urls'])
 
             # date
             try:
                 row['date'] = datetime.strptime(cells[0].text, '%d.%m.%Y')
             except ValueError:
                 row['date'] = cells[0].text
-
-            # name/desc/category
-            details = self.parse_description(cells[1])
-
-            # TODO
-            # if pdf, done
-            # else load MORE details and categories?
-
 
             # person
             if cells[2].find('a'):
@@ -99,20 +110,43 @@ class BratislavaScraper(object):
                 # missing responsible person or one without personal page
                 row['responsible_person'] = None
 
+            print row
+
+
+    def scrape_documents(self, page_id):
+        content = self.get_content(self.DETAILS_TPL.format(page_id))
+        soup = bs(content)
+        links = soup.find('div', {'class': 'odkazy'})
+
+        document_urls = []
+        for li in links.find_all('li'):
+            if not li.a:
+                continue
+
+            if li.a['href'].startswith(self.DOCUMENT_PATH):
+                document_urls.append(urlparse.urljoin(self.DOCUMENT_PATH, li.a['href']))
+
+        return document_urls
+
 
     def parse_description(self, node):
-        details = {}
+        # default None values
+        data = {'title': None,
+                'document_urls': None,
+                'html_id': None
+                }
 
+        # title
         if node.strong and node.strong.a:
             target = node.strong.a['href']
-            details['title'] = node.strong.a.text
+            data['title'] = node.strong.a.text
         elif node.strong:
             target = None
-            details['title'] = node.strong.text
+            data['title'] = node.strong.text
         else:
             target = None
-            details['title'] = None
 
+        # either document or details url
         if target:
             url = urlparse.urlparse(target)
             params = self.get_url_params(target)
@@ -120,42 +154,38 @@ class BratislavaScraper(object):
             if url.path.startswith(self.DETAILS_PATH):
                 # this entry has separate page
                 if 'id' in params:
-                    details['id'] = params['id'][0]
+                    data['html_id'] = params['id'][0]
 
             elif url.path.startswith(self.DOCUMENT_PATH):
                 # direct link to (PDF) document
                 if 'dokument_id' in params:
-                    details['pdf_ids'] = [params['dokument_id'][0]]
-                    details['pdf_urls'] = [urlparse.urljoin(self.DOMAIN, target)]
+                    data['document_urls'] = [urlparse.urljoin(self.DOMAIN, target)]
             else:
-                # unknow url format
+                # other url formats
                 pass
 
-        # not an url we can continue to, use details provided in the table
-        if 'id' not in details:
-            details['id'] = None
-
-        # fill in more details in case we can't get them later
+        # fill in description
         if node.div and node.div.br:
             print node.div.br.previous_sibling
-            details['description'] = node.div.br.previous_sibling.text
+            data['description'] = node.div.br.previous_sibling
         elif node.div:
-            details['description'] = node.div.text
+            data['description'] = node.div.text
         else:
-            details['description'] = node.text
+            data['description'] = node.text
         
+        # category
         category = node.find('div', {'class': 'ktg'})
         if category and category.a:
             try:
                 params = self.get_url_params(category.a['href'])
-                details['category_id'] = params['id_ktg'][0]
+                data['category_id'] = params['id_ktg'][0]
             except KeyError:
-                details['category_id'] = None
+                data['category_id'] = None
                 pass
         else:
-            details['category_id'] = None
+            data['category_id'] = None
 
-        return details
+        return data
 
 
     def scrape_person(self, a):
