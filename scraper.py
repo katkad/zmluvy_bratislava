@@ -133,15 +133,15 @@ class BratislavaScraper(object):
             if row['html_id']:
                 html_id = scraperwiki.sqlite.get_var('html_id')
                 if html_id == row['html_id']:
-                    logging.info('Reached known result (html_id): "{}"'.format(html_id))
-                    break
+                    logging.debug('Reached known result (html_id): "{}"'.format(html_id))
+                    continue
                 scraperwiki.sqlite.save_var('html_id', row['html_id'])
 
             elif row['document_ids']:
                 doc_ids = scraperwiki.sqlite.get_var('doc_ids')
                 if doc_ids == row['document_ids']:
-                    logging.info('Reached known result (doc_ids): "{}"'.format(doc_ids))
-                    break
+                    logging.debug('Reached known result (doc_ids): "{}"'.format(doc_ids))
+                    continue
                 scraperwiki.sqlite.save_var('doc_ids', row['document_ids'])
 
             else:
