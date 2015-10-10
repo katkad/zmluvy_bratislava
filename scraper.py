@@ -1,13 +1,11 @@
 #!/bin/env python2
 from bs4 import BeautifulSoup as bs
-from collections import OrderedDict
 from datetime import datetime
 import scraperwiki
 import urlparse
 import requests
 import logging
 import json
-import time
 
 from database import create_db
 
@@ -31,7 +29,7 @@ class BratislavaScraper(object):
     DOCUMENT_TPL = '/register/VismoOnline_ActionScripts/File.ashx?id_org=700026&id_dokumenty={}'
 
 
-    LISTING_AMOUNT = 10  # max 100
+    LISTING_AMOUNT = 100  # max 100
     MAX_PAGES = 1
     HTTP_OK_CODES = [200]
 
