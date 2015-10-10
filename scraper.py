@@ -55,7 +55,7 @@ class BratislavaScraper(object):
 
 
     def parse_person_email(self, html):
-        soup = bs(html)
+        soup = bs(html, "html.parser")
 
         dl = soup.find('div', {'id': 'osobnost'}).dl
         for dd in dl.find_all('dd'):
@@ -96,7 +96,7 @@ class BratislavaScraper(object):
         '''
         Parse results table = get date, details, person and possibly additional documents
         '''
-        soup = bs(html)
+        soup = bs(html, "html.parser")
 
         table = soup.find('div', {'id': 'kategorie'}).find('table', {'class': 'seznam'})
         
@@ -166,7 +166,7 @@ class BratislavaScraper(object):
         For given page id, return list of documents + process categories.
         '''
         content = self.get_content(self.DETAILS_TPL.format(page_id))
-        soup = bs(content)
+        soup = bs(content, "html.parser")
         links = soup.find('div', {'class': 'odkazy'})
 
         document_urls = []

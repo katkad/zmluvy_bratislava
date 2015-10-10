@@ -1,2 +1,11 @@
 *.pyc
+
+# Ignore output of scraper
 *.sqlite
+*.sqlite-journal
+
+# Ignore virtual environments
+envs
+
+# Ignore IDE stuff
+.idea
