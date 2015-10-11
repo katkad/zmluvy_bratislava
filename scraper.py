@@ -52,13 +52,20 @@ class BratislavaScraper(object):
             return None
 
 
-    def parse_person_email(self, html):
+    def parse_person_contact_details(self, html):
         soup = bs(html, "html.parser")
+        contacts = {}
 
         dl = soup.find('div', {'id': 'osobnost'}).dl
         for dd in dl.find_all('dd'):
             if dd.a:
-                return dd.a.text
+                contacts['email'] = dd.a.text
+            else:
+                contacts['other'] = dd.text
+
+        # TODO: section
+
+        return contacts
 
 
     def get_content(self, path):
@@ -99,6 +106,7 @@ class BratislavaScraper(object):
         table = soup.find('div', {'id': 'kategorie'}).find('table', {'class': 'seznam'})
         
         for table_row in table.tbody.find_all('tr'):
+            # Rows in table: Date, Details, Person
             cells = table_row.find_all('td')
 
             # name/desc/category
@@ -117,7 +125,7 @@ class BratislavaScraper(object):
             except ValueError:
                 row['date'] = cells[0].text
 
-            # person
+            # 3rd column responsible PERSON
             if cells[2].find('a'):
                 row['responsible_person'] = self.scrape_person(cells[2].a)
             else:
@@ -247,7 +255,6 @@ class BratislavaScraper(object):
         '''
         Download person info and save it to db if it's not already there.
         '''
-
         params = self.get_url_params(a['href'])
         id_o = int(params['id_o'][0])
         
@@ -262,12 +269,13 @@ class BratislavaScraper(object):
 
         content = self.get_content(self.PEOPLE_TPL.format(id_o))
         if content:
-            person['email'] = self.parse_person_email(content)
+            person.update(self.parse_person_contact_details(content))
         else:
             person['email'] = None
-        
-        # logging.info('Inserting person "{}" into database'.format(person['name']))
+            person['other'] = None
+
         scraperwiki.sqlite.save(['id'], person, table_name='people')
+        logging.debug('Person "{}" saved into database'.format(person['name'].encode("UTF-8")))
 
         return id_o
 

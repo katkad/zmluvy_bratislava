@@ -9,7 +9,8 @@ def create_db():
         CREATE TABLE IF NOT EXISTS people(
             id INTEGER PRIMARY KEY,
             name TEXT,
-            email TEXT)
+            email TEXT,
+            other TEXT)
     ''')
 
     # categories table
