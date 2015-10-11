@@ -19,6 +19,8 @@ class BratislavaScraper(object):
 
     # path template to page with personal details
     PEOPLE_TPL = '/register/vismo/o_osoba.asp?id_org=700026&id_o={}'
+    # path to section page, list of all people in the section
+    SECTION_TPL = '/register/vismo/o_utvar.asp?id_org=700026&id_u={}'
 
     # entry details page
     DETAILS_PATH = '/register/vismo/dokumenty2.asp'
@@ -54,7 +56,35 @@ class BratislavaScraper(object):
 
     def parse_person_contact_details(self, html):
         soup = bs(html, "html.parser")
-        contacts = {}
+
+        section = {'id': None, 'name': None, 'url': None}
+        contacts = {'email': None, 'other': None, 'section_id': None}
+
+        li = soup.find('div', {'id': 'osobnost'}).li
+        parent_link_id = None
+        for a in li.find_all('a'):
+
+            params = self.get_url_params(a['href'])
+            section['id'] = int(params['id_u'][0])
+            section['name'] = a.text
+            section['url'] = self.SECTION_TPL.format(section['id'])
+            if parent_link_id:
+                section['parent_section_id'] = parent_link_id
+
+            if section['id']:
+                # check whether the section is already in db
+                if scraperwiki.sqlite.select('id FROM sections WHERE id=?', data=[section['id']]):
+                    logging.debug('Section "{}" is already in database'.format(section['name'].encode("UTF-8")))
+                else:
+                    scraperwiki.sqlite.save(['id'], section, table_name='sections')
+                    logging.debug('Section "{}" saved into database'.format(section['name'].encode("UTF-8")))
+
+            # set current id as parent so in next loop we got the id
+            parent_link_id = section['id']
+
+        # last section in the loop
+        if parent_link_id:
+            contacts['section_id'] = parent_link_id
 
         dl = soup.find('div', {'id': 'osobnost'}).dl
         for dd in dl.find_all('dd'):
@@ -62,8 +92,6 @@ class BratislavaScraper(object):
                 contacts['email'] = dd.a.text
             else:
                 contacts['other'] = dd.text
-
-        # TODO: section
 
         return contacts
 
@@ -257,10 +285,11 @@ class BratislavaScraper(object):
         '''
         params = self.get_url_params(a['href'])
         id_o = int(params['id_o'][0])
-        
+
         # check whether the person is already in db
-        person = scraperwiki.sqlite.select('id FROM people WHERE id=?', data=[id_o])
+        person = scraperwiki.sqlite.select('id,name FROM people WHERE id=?', data=[id_o])
         if person:
+            logging.debug('Person "{}" is already in database'.format(person[0]['name'].encode("UTF-8")))
             return id_o
 
         person = {}
@@ -284,6 +313,6 @@ if __name__ == '__main__':
     # create tables explicitly
     create_db()
 
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
     scraper = BratislavaScraper(sleep=1/10)
     scraper.scrape()
