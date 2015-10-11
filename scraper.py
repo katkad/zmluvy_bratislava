@@ -87,11 +87,13 @@ class BratislavaScraper(object):
             contacts['section_id'] = parent_link_id
 
         dl = soup.find('div', {'id': 'osobnost'}).dl
-        for dd in dl.find_all('dd'):
-            if dd.a:
-                contacts['email'] = dd.a.text
-            else:
-                contacts['other'] = dd.text
+
+        if dl:
+            for dd in dl.find_all('dd'):
+                if dd.a:
+                    contacts['email'] = dd.a.text
+                else:
+                    contacts['other'] = dd.text
 
         return contacts
 
