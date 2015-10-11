@@ -31,7 +31,7 @@ class BratislavaScraper(object):
     DOCUMENT_TPL = '/register/VismoOnline_ActionScripts/File.ashx?id_org=700026&id_dokumenty={}'
 
 
-    LISTING_AMOUNT = 100  # max 100
+    LISTING_AMOUNT = 10  # max 100
     MAX_PAGES = 1
     HTTP_OK_CODES = [200]
 
@@ -116,15 +116,36 @@ class BratislavaScraper(object):
         Main entry point
         '''
         logging.debug('Start scraping... Getting content for 1 to {} rows...'.format(self.LISTING_AMOUNT))
+        content = self.get_content(self.LIST_TPL.format(limit=self.LISTING_AMOUNT, page=1))
 
-        # TODO check pages from actual page OR check for unknow page result
-        for page in xrange(1, self.MAX_PAGES + 1):
-            content = self.get_content(self.LIST_TPL.format(limit=self.LISTING_AMOUNT, page=page))
-            if not content:
-                break
+        if not content:
+            logging.error('Content not found!')
+            raise
 
-            if self.parse_list(content) is None:
-                break
+        soup = bs(content, "html.parser")
+        listovanie = soup.find('div', {'id': 'kategorie'}).find('div', {'class': 'strlistovani'})
+        last_page = 1
+        for a in listovanie.find_all('a'):
+            if a.text and int(a.text) > last_page:
+                last_page = int(a.text)
+        logging.debug('Total pages {} for parsing, with {} rows each.'.format(last_page, self.LISTING_AMOUNT))
+
+        if self.parse_list(content) is None:
+            logging.error('Content parse failed!')
+            raise
+
+        if last_page > 1:
+
+            for page in xrange(2, last_page):
+                start = (page-1) * self.LISTING_AMOUNT +1
+                stop = page * self.LISTING_AMOUNT
+                logging.debug('Scraping next page... Getting content for {} to {} rows...'.format(start, stop))
+                content = self.get_content(self.LIST_TPL.format(limit=self.LISTING_AMOUNT, page=page))
+                if not content:
+                    break
+
+                if self.parse_list(content) is None:
+                    break
         
 
     def parse_list(self, html):
