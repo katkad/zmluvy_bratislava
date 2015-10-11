@@ -111,7 +111,7 @@ class BratislavaScraper(object):
         response = requests.get(url)
 
         if response.status_code not in self.HTTP_OK_CODES:
-            logging.error('Could not load category list from "{}" (CODE: {})'.format(url, response.status_code))
+            logging.error('Could not load page "{}" (CODE: {})'.format(url, response.status_code))
             return None
 
         return response.text
@@ -231,6 +231,10 @@ class BratislavaScraper(object):
         For given page id, return list of documents + process categories.
         '''
         content = self.get_content(self.DETAILS_TPL.format(page_id))
+
+        if not content:
+            return []
+
         soup = bs(content, "html.parser")
         links = soup.find('div', {'class': 'odkazy'})
 
