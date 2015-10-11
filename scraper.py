@@ -77,7 +77,7 @@ class BratislavaScraper(object):
                     logging.debug('Section "{}" is already in database'.format(section['name'].encode("UTF-8")))
                 else:
                     scraperwiki.sqlite.save(['id'], section, table_name='sections')
-                    logging.debug('Section "{}" saved into database'.format(section['name'].encode("UTF-8")))
+                    logging.info('Section "{}" saved into database'.format(section['name'].encode("UTF-8")))
 
             # set current id as parent so in next loop we got the id
             parent_link_id = section['id']
@@ -115,12 +115,14 @@ class BratislavaScraper(object):
         '''
         Main entry point
         '''
+        logging.debug('Start scraping... Getting content for 1 to {} rows...'.format(self.LISTING_AMOUNT))
+
         # TODO check pages from actual page OR check for unknow page result
         for page in xrange(1, self.MAX_PAGES + 1):
             content = self.get_content(self.LIST_TPL.format(limit=self.LISTING_AMOUNT, page=page))
             if not content:
                 break
-             
+
             if self.parse_list(content) is None:
                 break
         
@@ -134,6 +136,7 @@ class BratislavaScraper(object):
         table = soup.find('div', {'id': 'kategorie'}).find('table', {'class': 'seznam'})
         
         for table_row in table.tbody.find_all('tr'):
+            logging.debug('Started parsing new row...')
             # Rows in table: Date, Details, Person
             cells = table_row.find_all('td')
 
@@ -186,10 +189,11 @@ class BratislavaScraper(object):
 
             try:
                 scraperwiki.sqlite.save(['html_id', 'document_ids'], row, table_name='data')
+                logging.info('Row "{}" saved into database'.format(row['title'].encode("UTF-8")))
             except:
+                logging.error('Saving data to DB has failed! Row "{}" has failed.'.format(row['title']))
                 print row
                 raise
-
         else:
             # for ended without break
             return True
@@ -211,8 +215,6 @@ class BratislavaScraper(object):
             if li.a['href'].startswith(self.DOCUMENT_PATH):
                 document_urls.append(urlparse.urljoin(self.DOCUMENT_PATH, li.a['href']))
 
-        # TODO process categories while we have the document
-
         return document_urls
 
 
@@ -226,7 +228,7 @@ class BratislavaScraper(object):
         # default None values
         data = {'title': None,
                 'document_urls': None,
-                'html_id': None
+                'html_id': None # id in url, it is id of the page displayed
                 }
 
         # title
@@ -298,6 +300,7 @@ class BratislavaScraper(object):
     def scrape_person(self, a):
         '''
         Download person info and save it to db if it's not already there.
+        Storing person in DB will also grab his section and store it in DB if it doesnt exists.
         '''
         params = self.get_url_params(a['href'])
         id_o = int(params['id_o'][0])
@@ -320,7 +323,7 @@ class BratislavaScraper(object):
             person['other'] = None
 
         scraperwiki.sqlite.save(['id'], person, table_name='people')
-        logging.debug('Person "{}" saved into database'.format(person['name'].encode("UTF-8")))
+        logging.info('Person "{}" saved into database'.format(person['name'].encode("UTF-8")))
 
         return id_o
 
