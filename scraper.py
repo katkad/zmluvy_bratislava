@@ -65,22 +65,26 @@ class BratislavaScraper(object):
         for a in li.find_all('a'):
 
             params = self.get_url_params(a['href'])
-            section['id'] = int(params['id_u'][0])
-            section['name'] = a.text
-            section['url'] = self.SECTION_TPL.format(section['id'])
-            if parent_link_id:
-                section['parent_section_id'] = parent_link_id
+            if 'id_u' in params:
+                section['id'] = int(params['id_u'][0])
+                section['name'] = a.text
+                section['url'] = self.SECTION_TPL.format(section['id'])
+                if parent_link_id:
+                    section['parent_section_id'] = parent_link_id
 
-            if section['id']:
-                # check whether the section is already in db
-                if scraperwiki.sqlite.select('id FROM sections WHERE id=?', data=[section['id']]):
-                    logging.debug('Section "{}" is already in database'.format(section['name'].encode("UTF-8")))
-                else:
-                    scraperwiki.sqlite.save(['id'], section, table_name='sections')
-                    logging.info('Section "{}" saved into database'.format(section['name'].encode("UTF-8")))
+                if section['id']:
+                    # check whether the section is already in db
+                    if scraperwiki.sqlite.select('id FROM sections WHERE id=?', data=[section['id']]):
+                        logging.debug('Section "{}" is already in database'.format(section['name'].encode("UTF-8")))
+                    else:
+                        scraperwiki.sqlite.save(['id'], section, table_name='sections')
+                        logging.info('Section "{}" saved into database'.format(section['name'].encode("UTF-8")))
 
-            # set current id as parent so in next loop we got the id
-            parent_link_id = section['id']
+                # set current id as parent so in next loop we got the id
+                parent_link_id = section['id']
+            else:
+                logging.debug('Section was not found on page')
+
 
         # last section in the loop
         if parent_link_id:
