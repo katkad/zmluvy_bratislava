@@ -137,7 +137,7 @@ class BratislavaScraper(object):
             # Rows in table: Date, Details, Person
             cells = table_row.find_all('td')
 
-            # name/desc/category
+            # 2nd column has all the details name/desc/category
             row = self.parse_description(cells[1])
 
             if row['html_id']:
@@ -219,8 +219,9 @@ class BratislavaScraper(object):
     def parse_description(self, node):
         '''
         Parse "Nazov" column from list of documents and return available details.
-
         - title, short description, link either to details page or document, category
+
+        Parsing category will check if it exists in DB and if not it will be stored.
         '''
         # default None values
         data = {'title': None,
@@ -267,12 +268,27 @@ class BratislavaScraper(object):
         # category
         category = node.find('div', {'class': 'ktg'})
         if category and category.a:
+
             try:
                 params = self.get_url_params(category.a['href'])
                 data['category_id'] = params['id_ktg'][0]
             except KeyError:
                 data['category_id'] = None
                 pass
+
+            if data['category_id']:
+                catagory_db = scraperwiki.sqlite.select('id,name FROM categories WHERE id=?',
+                                                        data=[int(data['category_id'])])
+
+                if catagory_db:
+                    logging.debug('Category "{}" is already in database'.format(catagory_db[0]['name'].encode("UTF-8")))
+                else:
+                    category = {
+                        'id': data['category_id'],
+                        'name': category.a.text
+                    }
+                    scraperwiki.sqlite.save(['id'], category, table_name='categories')
+                    logging.info('Category "{}" saved into database'.format(category['name'].encode("UTF-8")))
         else:
             data['category_id'] = None
 
