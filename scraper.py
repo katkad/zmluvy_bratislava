@@ -75,10 +75,9 @@ class BratislavaScraper(object):
                 if section['id']:
                     # check whether the section is already in db
                     if scraperwiki.sqlite.select('id FROM sections WHERE id=?', data=[section['id']]):
-                        logging.debug('Section "{}" is already in database'.format(section['name'].encode("UTF-8")))
+                        pass
                     else:
                         scraperwiki.sqlite.save(['id'], section, table_name='sections')
-                        logging.info('Section "{}" saved into database'.format(section['name'].encode("UTF-8")))
 
                 # set current id as parent so in next loop we got the id
                 parent_link_id = section['id']
@@ -145,7 +144,7 @@ class BratislavaScraper(object):
             for page in xrange(2, last_page):
                 start = (page-1) * self.LISTING_AMOUNT +1
                 stop = page * self.LISTING_AMOUNT
-                logging.debug('Scraping next page... Getting content for {} to {} rows...'.format(start, stop))
+                logging.info('Scraping next page... Getting content for {} to {} rows...'.format(start, stop))
                 content = self.get_content(self.LIST_TPL.format(limit=self.LISTING_AMOUNT, page=page))
                 if not content:
                     break
@@ -163,7 +162,6 @@ class BratislavaScraper(object):
         table = soup.find('div', {'id': 'kategorie'}).find('table', {'class': 'seznam'})
         
         for table_row in table.tbody.find_all('tr'):
-            logging.debug('Started parsing new row...')
             # Rows in table: Date, Details, Person
             cells = table_row.find_all('td')
 
@@ -206,7 +204,7 @@ class BratislavaScraper(object):
             elif row['document_ids']:
                 doc_ids = scraperwiki.sqlite.get_var('doc_ids')
                 if doc_ids == row['document_ids']:
-                    logging.debug('Reached known result (doc_ids): "{}"'.format(doc_ids))
+                    # reached known result (doc_ids)
                     continue
                 scraperwiki.sqlite.save_var('doc_ids', row['document_ids'])
 
@@ -216,7 +214,6 @@ class BratislavaScraper(object):
 
             try:
                 scraperwiki.sqlite.save(['html_id', 'document_ids'], row, table_name='data')
-                logging.info('Row "{}" saved into database'.format(row['title'].encode("UTF-8")))
             except:
                 logging.error('Saving data to DB has failed! Row "{}" has failed.'.format(row['title']))
                 print row
@@ -314,14 +311,13 @@ class BratislavaScraper(object):
                                                         data=[int(data['category_id'])])
 
                 if catagory_db:
-                    logging.debug('Category "{}" is already in database'.format(catagory_db[0]['name'].encode("UTF-8")))
+                    pass
                 else:
                     category = {
                         'id': data['category_id'],
                         'name': category.a.text
                     }
                     scraperwiki.sqlite.save(['id'], category, table_name='categories')
-                    logging.info('Category "{}" saved into database'.format(category['name'].encode("UTF-8")))
         else:
             data['category_id'] = None
 
@@ -339,7 +335,6 @@ class BratislavaScraper(object):
         # check whether the person is already in db
         person = scraperwiki.sqlite.select('id,name FROM people WHERE id=?', data=[id_o])
         if person:
-            logging.debug('Person "{}" is already in database'.format(person[0]['name'].encode("UTF-8")))
             return id_o
 
         person = {}
@@ -354,7 +349,6 @@ class BratislavaScraper(object):
             person['other'] = None
 
         scraperwiki.sqlite.save(['id'], person, table_name='people')
-        logging.info('Person "{}" saved into database'.format(person['name'].encode("UTF-8")))
 
         return id_o
 
@@ -363,6 +357,6 @@ if __name__ == '__main__':
     # create tables explicitly
     create_db()
 
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
+    logging.basicConfig(format='%(levelname)s: %(message)s')
     scraper = BratislavaScraper(sleep=1/10)
     scraper.scrape()
