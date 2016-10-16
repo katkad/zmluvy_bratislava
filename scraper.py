@@ -6,6 +6,7 @@ import urlparse
 import requests
 import logging
 import json
+import time
 
 from database import create_db
 
@@ -111,6 +112,7 @@ class BratislavaScraper(object):
 
         if response.status_code not in self.HTTP_OK_CODES:
             logging.error('Could not load page "{}" (CODE: {})'.format(url, response.status_code))
+            time.sleep(5)
             return None
 
         return response.text
