@@ -108,7 +108,14 @@ class BratislavaScraper(object):
         '''
         url = urlparse.urljoin(self.DOMAIN, path)
         logging.info('Requesting content from url: "{}"'.format(url))
-        response = requests.get(url)
+
+        response = ''
+        try:
+            response = requests.get(url)
+        except Exception as e:
+            logging.error('Could not load page "{}" (ERROR: {})'.format(url, format(e)))
+            time.sleep(5)
+            return None
 
         if response.status_code not in self.HTTP_OK_CODES:
             logging.error('Could not load page "{}" (CODE: {})'.format(url, response.status_code))
